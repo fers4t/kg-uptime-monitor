@@ -54,8 +54,8 @@ telegram_bot_token: "YOUR_TELEGRAM_BOT_TOKEN"
 telegram_chat_id: "YOUR_CHAT_ID"
 
 # General settings
-check_interval: 60  # seconds
-timeout: 10  # seconds
+check_interval: 60 # seconds
+timeout: 10 # seconds
 ```
 
 4. **Run the monitor**
@@ -66,24 +66,24 @@ python system_monitor.py
 
 ## 🔧 Configuration Options
 
-| Option | Description |
-|--------|-------------|
-| `targets` | List of systems to monitor |
-| `telegram_bot_token` | Your Telegram bot token |
-| `telegram_chat_id` | Chat ID to send notifications to |
-| `check_interval` | How often to check systems (seconds) |
-| `timeout` | Request timeout (seconds) |
+| Option               | Description                          |
+| -------------------- | ------------------------------------ |
+| `targets`            | List of systems to monitor           |
+| `telegram_bot_token` | Your Telegram bot token              |
+| `telegram_chat_id`   | Chat ID to send notifications to     |
+| `check_interval`     | How often to check systems (seconds) |
+| `timeout`            | Request timeout (seconds)            |
 
 ### Target Options
 
-| Option | Description |
-|--------|-------------|
-| `id` | Friendly name for the system |
-| `url` | URL to check |
-| `method` | HTTP method (GET, POST, etc.) |
-| `expected_status_code` | Expected HTTP status code |
-| `headers` | Optional HTTP headers |
-| `failure_threshold` | Number of consecutive failures before alert |
+| Option                 | Description                                 |
+| ---------------------- | ------------------------------------------- |
+| `id`                   | Friendly name for the system                |
+| `url`                  | URL to check                                |
+| `method`               | HTTP method (GET, POST, etc.)               |
+| `expected_status_code` | Expected HTTP status code                   |
+| `headers`              | Optional HTTP headers                       |
+| `failure_threshold`    | Number of consecutive failures before alert |
 
 ## 📱 Telegram Setup
 
