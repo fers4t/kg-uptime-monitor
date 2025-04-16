@@ -5,18 +5,25 @@ import logging
 import os
 import platform
 import schedule
+import json
 from datetime import datetime
 
+class RailwayJSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_obj = {
+            "msg": record.getMessage(),
+            "level": record.levelname.lower(),
+            "timestamp": self.formatTime(record),
+            "logger": record.name
+        }
+        return json.dumps(log_obj, ensure_ascii=False)
+
 # Loglama ayarları
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("system_monitor.log"),
-        logging.StreamHandler()
-    ]
-)
+handler = logging.StreamHandler()
+handler.setFormatter(RailwayJSONFormatter())
 logger = logging.getLogger("SystemMonitor")
+logger.setLevel(logging.INFO)
+logger.handlers = [handler]
 
 class SystemMonitor:
     def __init__(self, config_path="config.yaml"):
@@ -47,7 +54,7 @@ class SystemMonitor:
         
     def load_config(self, config_path):
         """
-        YAML yapılandırma dosyasını yükler
+        YAML yapılandırma dosyasını yükler veya çevre değişkenlerini kullanır
         
         Args:
             config_path (str): Yapılandırma dosyasının yolu
@@ -94,14 +101,17 @@ class SystemMonitor:
                 timeout=self.timeout
             )
             
-            # İsteğin başarılı olup olmadığını kontrol et
             status_code = response.status_code
             expected_status = target.get("expected_status_code", 200)
             
             if status_code == expected_status:
-                logger.debug(f"Hedef {target_id} ulaşılabilir. Durum kodu: {status_code}")
+                logger.debug(json.dumps({
+                    "msg": f"Hedef {target_id} ulaşılabilir",
+                    "level": "debug",
+                    "target_id": target_id,
+                    "status_code": status_code
+                }, ensure_ascii=False))
                 
-                # Eğer sistem daha önce çalışmıyorsa ve şimdi çalışıyorsa, iyileşme bildirimi gönder
                 if self.status[target_id]["last_status"] == "down":
                     recovery_time = datetime.now()
                     downtime = (recovery_time - self.status[target_id]["last_check"]).total_seconds()
@@ -112,16 +122,34 @@ class SystemMonitor:
                               f"Kesinti Süresi: {int(downtime)} saniye\n"\
                               f"Kurtarma Zamanı: {recovery_time.strftime('%H:%M:%S %d-%m-%Y')}"
                     self.send_telegram_message(message)
+                    logger.info(json.dumps({
+                        "msg": f"Sistem tekrar çalışıyor: {target_id}",
+                        "level": "info",
+                        "target_id": target_id,
+                        "downtime_seconds": int(downtime),
+                        "recovery_time": recovery_time.strftime('%H:%M:%S %d-%m-%Y')
+                    }, ensure_ascii=False))
                 
                 self.status[target_id]["last_status"] = "up"
                 self.status[target_id]["failures"] = 0
                 return True
             else:
-                logger.warning(f"Hedef {target_id} beklenmeyen durum kodu döndürdü: {status_code}")
+                logger.warning(json.dumps({
+                    "msg": f"Hedef {target_id} beklenmeyen durum kodu döndürdü: {status_code}",
+                    "level": "warn",
+                    "target_id": target_id,
+                    "status_code": status_code,
+                    "expected_status": expected_status
+                }, ensure_ascii=False))
                 return False
                 
         except requests.RequestException as e:
-            logger.error(f"Hedef {target_id} kontrol edilirken hata oluştu: {e}")
+            logger.error(json.dumps({
+                "msg": f"Hedef {target_id} kontrol edilirken hata oluştu: {str(e)}",
+                "level": "error",
+                "target_id": target_id,
+                "error": str(e)
+            }, ensure_ascii=False))
             return False
     
     def send_telegram_message(self, message):
@@ -135,7 +163,10 @@ class SystemMonitor:
             bool: Mesaj başarıyla gönderildi ise True, gönderilemediyse False
         """
         if not self.telegram_bot_token or not self.telegram_chat_id:
-            logger.warning("Telegram bilgileri eksik. Bildirim gönderilemiyor.")
+            logger.warning(json.dumps({
+                "msg": "Telegram bilgileri eksik. Bildirim gönderilemiyor.",
+                "level": "warn"
+            }, ensure_ascii=False))
             return False
             
         try:
@@ -148,42 +179,50 @@ class SystemMonitor:
             response = requests.post(url, data=data, timeout=10)
             
             if response.status_code == 200:
-                logger.info("Telegram bildirimi başarıyla gönderildi")
+                logger.info(json.dumps({
+                    "msg": "Telegram bildirimi başarıyla gönderildi",
+                    "level": "info"
+                }, ensure_ascii=False))
                 return True
             else:
-                logger.error(f"Telegram bildirimi gönderilirken hata oluştu: {response.text}")
+                logger.error(json.dumps({
+                    "msg": f"Telegram bildirimi gönderilirken hata oluştu: {response.text}",
+                    "level": "error",
+                    "response_text": response.text,
+                    "status_code": response.status_code
+                }, ensure_ascii=False))
                 return False
                 
         except Exception as e:
-            logger.error(f"Telegram bildirimi gönderilirken istisna oluştu: {e}")
+            logger.error(json.dumps({
+                "msg": f"Telegram bildirimi gönderilirken istisna oluştu: {str(e)}",
+                "level": "error",
+                "error": str(e)
+            }, ensure_ascii=False))
             return False
     
     def check_all_targets(self):
         """
         Tüm hedeflerin durumunu kontrol eder ve gerekirse bildirim gönderir
         """
-        logger.info("Tüm hedefler kontrol ediliyor...")
+        logger.info(json.dumps({
+            "msg": "Tüm hedefler kontrol ediliyor...",
+            "level": "info"
+        }, ensure_ascii=False))
         
         for target in self.targets:
             target_id = target.get("id", target.get("url", "unknown"))
             current_time = datetime.now()
             
-            # Hedefi kontrol et
             is_available = self.check_target(target)
-            
-            # Son kontrol zamanını güncelle
             self.status[target_id]["last_check"] = current_time
             
             if not is_available:
-                # Başarısız kontrol sayısını artır
                 self.status[target_id]["failures"] += 1
-                
-                # Yapılandırma dosyasından veya varsayılan olarak 3 başarısız deneme sonrası bildirim gönder
                 failure_threshold = target.get("failure_threshold", 3)
                 
                 if self.status[target_id]["failures"] >= failure_threshold:
                     if self.status[target_id]["last_status"] != "down":
-                        # Durum değişti, bildirim gönder
                         message = f"🔴 SİSTEM ÇALIŞMIYOR\n\n"\
                                   f"Hedef: {target_id}\n"\
                                   f"URL: {target.get('url', '')}\n"\
@@ -192,34 +231,56 @@ class SystemMonitor:
                         
                         self.send_telegram_message(message)
                         self.status[target_id]["last_status"] = "down"
-                        logger.warning(f"Hedef {target_id} çalışmıyor! Bildirim gönderildi.")
+                        logger.error(json.dumps({
+                            "msg": f"Hedef {target_id} çalışmıyor! Bildirim gönderildi.",
+                            "level": "error",
+                            "target_id": target_id,
+                            "failures": self.status[target_id]['failures'],
+                            "time": current_time.strftime('%H:%M:%S %d-%m-%Y')
+                        }, ensure_ascii=False))
                 else:
-                    logger.warning(f"Hedef {target_id} kontrolü başarısız. Başarısız deneme sayısı: {self.status[target_id]['failures']}")
+                    logger.warning(json.dumps({
+                        "msg": f"Hedef {target_id} kontrolü başarısız",
+                        "level": "warn",
+                        "target_id": target_id,
+                        "failures": self.status[target_id]['failures']
+                    }, ensure_ascii=False))
             else:
-                # Hedef çalışıyor
-                self.status[target_id]["last_status"] = "up"
-                logger.info(f"Hedef {target_id} başarıyla kontrol edildi. Sistem çalışıyor.")
+                logger.info(json.dumps({
+                    "msg": f"Hedef {target_id} başarıyla kontrol edildi",
+                    "level": "info",
+                    "target_id": target_id,
+                    "status": "up"
+                }, ensure_ascii=False))
     
     def run(self):
         """
         Uygulamayı belirtilen aralıklarla çalıştırır
         """
-        # İlk kez hemen kontrol et
         self.check_all_targets()
-        
-        # Düzenli kontroller için zamanlama
         schedule.every(self.check_interval).seconds.do(self.check_all_targets)
         
-        logger.info(f"Sistem izleme çalışıyor. Kontrol aralığı: {self.check_interval} saniye")
+        logger.info(json.dumps({
+            "msg": f"Sistem izleme çalışıyor. Kontrol aralığı: {self.check_interval} saniye",
+            "level": "info",
+            "check_interval": self.check_interval
+        }, ensure_ascii=False))
         
         try:
             while True:
                 schedule.run_pending()
                 time.sleep(1)
         except KeyboardInterrupt:
-            logger.info("Uygulama kullanıcı tarafından durduruldu.")
+            logger.info(json.dumps({
+                "msg": "Uygulama kullanıcı tarafından durduruldu.",
+                "level": "info"
+            }, ensure_ascii=False))
         except Exception as e:
-            logger.error(f"Uygulama çalışırken hata oluştu: {e}")
+            logger.error(json.dumps({
+                "msg": f"Uygulama çalışırken hata oluştu: {str(e)}",
+                "level": "error",
+                "error": str(e)
+            }, ensure_ascii=False))
 
 if __name__ == "__main__":
     monitor = SystemMonitor()
