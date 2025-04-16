@@ -144,6 +144,9 @@ class SystemMonitor:
                 return False
                 
         except requests.RequestException as e:
+            error_msg = f"❌ SİSTEM HATASI\n\nHedef: {target_id}\nURL: {url}\nHata: {str(e)}"
+            self.send_telegram_message(error_msg)
+            
             logger.error(json.dumps({
                 "msg": f"Hedef {target_id} kontrol edilirken hata oluştu: {str(e)}",
                 "level": "error",
@@ -163,42 +166,26 @@ class SystemMonitor:
             bool: Mesaj başarıyla gönderildi ise True, gönderilemediyse False
         """
         if not self.telegram_bot_token or not self.telegram_chat_id:
-            logger.warning(json.dumps({
-                "msg": "Telegram bilgileri eksik. Bildirim gönderilemiyor.",
-                "level": "warn"
-            }, ensure_ascii=False))
+            logger.warning("Telegram bilgileri eksik. Bildirim gönderilemiyor.")
             return False
             
         try:
             url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
             data = {
                 "chat_id": self.telegram_chat_id,
-                "text": message,
-                "parse_mode": "HTML"
+                "text": message
             }
             response = requests.post(url, data=data, timeout=10)
             
             if response.status_code == 200:
-                logger.info(json.dumps({
-                    "msg": "Telegram bildirimi başarıyla gönderildi",
-                    "level": "info"
-                }, ensure_ascii=False))
+                logger.info("Telegram bildirimi başarıyla gönderildi")
                 return True
             else:
-                logger.error(json.dumps({
-                    "msg": f"Telegram bildirimi gönderilirken hata oluştu: {response.text}",
-                    "level": "error",
-                    "response_text": response.text,
-                    "status_code": response.status_code
-                }, ensure_ascii=False))
+                logger.error(f"Telegram bildirimi gönderilirken hata oluştu: {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(json.dumps({
-                "msg": f"Telegram bildirimi gönderilirken istisna oluştu: {str(e)}",
-                "level": "error",
-                "error": str(e)
-            }, ensure_ascii=False))
+            logger.error(f"Telegram bildirimi gönderilirken istisna oluştu: {e}")
             return False
     
     def check_all_targets(self):
