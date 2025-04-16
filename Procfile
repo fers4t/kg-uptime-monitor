@@ -1,1 +1,1 @@
-worker: python system_monitor.py
+worker: python monitor.py
