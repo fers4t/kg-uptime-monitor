@@ -112,7 +112,7 @@ class SystemMonitor:
                     "status_code": status_code
                 }, ensure_ascii=False))
                 
-                if self.status[target_id]["last_status"] == "down":
+                if self.status[target_id]["last_status"] == "down" or self.status[target_id]["failures"] > 0:
                     recovery_time = datetime.now()
                     downtime = (recovery_time - self.status[target_id]["last_check"]).total_seconds()
                     message = f"✅ SİSTEM TEKRAR ÇALIŞIYOR\n\n"\
@@ -134,6 +134,14 @@ class SystemMonitor:
                 self.status[target_id]["failures"] = 0
                 return True
             else:
+                warning_msg = f"⚠️ SİSTEM UYARISI\n\n"\
+                             f"Hedef: {target_id}\n"\
+                             f"URL: {url}\n"\
+                             f"Beklenen Durum Kodu: {expected_status}\n"\
+                             f"Alınan Durum Kodu: {status_code}\n"\
+                             f"Zaman: {datetime.now().strftime('%H:%M:%S %d-%m-%Y')}"
+                self.send_telegram_message(warning_msg)
+                
                 logger.warning(json.dumps({
                     "msg": f"Hedef {target_id} beklenmeyen durum kodu döndürdü: {status_code}",
                     "level": "warn",
